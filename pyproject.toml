@@ -23,6 +23,10 @@ core_cpu = [
     "torch-geometric",
 ]
 
+claude = [
+    "pypdf"
+]
+
 dev = [
     "pytest",
     "ruff",
