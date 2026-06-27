@@ -1,0 +1,2 @@
+# mgn
+MeshGraphNets
