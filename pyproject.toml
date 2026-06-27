@@ -17,10 +17,12 @@ packages = ["src/mgn"]
 
 [dependency-groups]
 
-core_rocm = [
+core_cpu = [
+    "tensorflow",
     "torch",
     "torch-geometric",
 ]
+
 dev = [
     "pytest",
     "ruff",
