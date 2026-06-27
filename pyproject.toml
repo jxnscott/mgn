@@ -1,0 +1,41 @@
+[project]
+name = "mgn"
+version = "0.1.0"
+description = "MeshGraphNets reimplementation"
+authors = [
+    { name = "Jackson Scott", email = "hello@jxnscott.com" },
+]
+requires-python = ">=3.12"
+
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mgn"]
+
+[dependency-groups]
+
+core_cpu = [
+    "tensorflow",
+    "torch",
+    "torch-geometric",
+]
+
+claude = [
+    "pypdf"
+]
+
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
