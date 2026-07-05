@@ -6,7 +6,7 @@ from typing import Any
 import tensorflow as tf
 
 
-def parse_proto(*, proto: tf.Tensor, meta: dict[str, Any]) -> dict[str, tf.Tensor]:
+def parse_proto(proto: tf.Tensor, *, meta: dict[str, Any]) -> dict[str, tf.Tensor]:
     """Parses one serialized trajectory record into its constituent tensors.
 
     Every field is stored in the tf.Example as raw bytes (via
