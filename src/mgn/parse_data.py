@@ -5,8 +5,12 @@ from typing import Any
 
 import tensorflow as tf
 
+# TODO: name these better
+PREFETCH = 1
+NUM_CPUS = 4
 
-def parse_proto(proto: tf.Tensor, *, meta: dict[str, Any]) -> dict[str, tf.Tensor]:
+
+def _parse_proto(proto: tf.Tensor, *, meta: dict[str, Any]) -> dict[str, tf.Tensor]:
     """Parses one serialized trajectory record into its constituent tensors.
 
     Every field is stored in the tf.Example as raw bytes (via
@@ -79,12 +83,32 @@ def load_dataset(*, path: Path, split: str) -> tf.data.Dataset:
 
     lazy_dataset = tf.data.TFRecordDataset(str(path / f"{split}.tfrecord"))
 
-    metadata_fused_parse = functools.partial(parse_proto, meta=metadata)
+    metadata_fused_parse = functools.partial(_parse_proto, meta=metadata)
 
     lazy_dataset = lazy_dataset.map(metadata_fused_parse, num_parallel_calls=8)
 
     # optimize performance by prefetching the next batch while the current is being
     # consumed.
-    lazy_dataset = lazy_dataset.prefetch(1)
+    lazy_dataset = lazy_dataset.prefetch(PREFETCH)
 
     return lazy_dataset
+
+
+def decompose_trajectories_into_training_pairs(*, dataset: tf.data.Dataset):
+
+    def _fn(trajectory: tf.Tensor):
+
+        output_tensor = {}
+        for feature, values in trajectory.items():
+            # For training we need velocity, therefore, the first training input requires
+            # the previous frame so that Δx can be computed.
+
+            output_tensor[feature] = values[1:-1]
+
+            if feature == "world_pos":
+                output_tensor["prev|" + feature] = values[0:-2]
+                output_tensor["target|" + feature] = values[2:]
+
+        return output_tensor
+
+    return dataset.map(_fn, num_parallel_calls=NUM_CPUS)
