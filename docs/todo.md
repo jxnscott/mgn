@@ -7,5 +7,5 @@
 ### 2026-07-07
 [x] Finished mapping what input is on paper for features in `meta.json`
 
-### 2026-07-08
+### 2026-07-11
 [ ] Now I need to build PyG object for `meta.json` features, the derived features will fall out. I stopped at function that breaks trajectories into training pairs so input can get velocity. Finish this, then move to function(s) that flatten training pairs, and then onto PyG object.
