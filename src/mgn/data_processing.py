@@ -66,7 +66,9 @@ def load_dataset(*, path: Path, split: str) -> tf.data.Dataset:
     lazy_dataset = tf.data.TFRecordDataset(str(path / f"{split}.tfrecord"))
 
     metadata_fused_parse = functools.partial(_parse_proto, meta=metadata)
-    lazy_dataset = lazy_dataset.map(metadata_fused_parse, num_parallel_calls=PARALLEL_CALLS)
+    lazy_dataset = lazy_dataset.map(
+        metadata_fused_parse, num_parallel_calls=PARALLEL_CALLS, deterministic=True
+    )
 
     # optimize performance by prefetching the next batch while the current is being
     # consumed.
