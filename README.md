@@ -9,6 +9,10 @@ extension.
 ````bash
 uv sync --all-groups          # dev
 uv sync --group core_cpu      # runtime
+
+# formattting
+uv run pre-commit install
+uv run nbstripout --install
 ````
 
 ## Reference

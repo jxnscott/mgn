@@ -28,8 +28,14 @@ claude = [
 ]
 
 dev = [
+    "ipykernel",
     "pytest",
-    "ruff",
+]
+
+formatting = [
+    "nbstripout",
+    "pre-commit",
+    "ruff==0.15.20",
 ]
 
 [[tool.uv.index]]
@@ -39,3 +45,10 @@ explicit = true
 
 [tool.uv.sources]
 torch = { index = "pytorch-cpu" }
+
+# ----- formatting -----
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint.isort]
+known-first-party = ["mgn"]
