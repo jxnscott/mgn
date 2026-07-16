@@ -29,13 +29,16 @@ claude = [
 
 dev = [
     "ipykernel",
-    "pytest",
 ]
 
 formatting = [
     "nbstripout",
     "pre-commit",
     "ruff==0.15.20",
+]
+
+tests = [
+    "pytest",
 ]
 
 [[tool.uv.index]]

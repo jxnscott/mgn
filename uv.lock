@@ -915,12 +915,14 @@ core-cpu = [
 ]
 dev = [
     { name = "ipykernel" },
-    { name = "pytest" },
 ]
 formatting = [
     { name = "nbstripout" },
     { name = "pre-commit" },
     { name = "ruff" },
+]
+tests = [
+    { name = "pytest" },
 ]
 
 [package.metadata]
@@ -932,15 +934,13 @@ core-cpu = [
     { name = "torch", index = "https://download.pytorch.org/whl/cpu" },
     { name = "torch-geometric" },
 ]
-dev = [
-    { name = "ipykernel" },
-    { name = "pytest" },
-]
+dev = [{ name = "ipykernel" }]
 formatting = [
     { name = "nbstripout" },
     { name = "pre-commit" },
     { name = "ruff", specifier = "==0.15.20" },
 ]
+tests = [{ name = "pytest" }]
 
 [[package]]
 name = "ml-dtypes"
