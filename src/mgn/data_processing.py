@@ -12,6 +12,17 @@ from tqdm.auto import tqdm
 PARALLEL_CALLS = 8
 PREFETCH_BUFFER = 1
 
+# Maps meta.json's string dtype names to their tf.DType. Used instead of
+# getattr(tf, schema["dtype"]) — autograph's tracing of getattr with a
+# dynamic string argument misbehaves in some contexts; a plain dict lookup
+# sidesteps that entirely.
+_DTYPE_MAP = {
+    "int32": tf.int32,
+    "int64": tf.int64,
+    "float32": tf.float32,
+    "float64": tf.float64,
+}
+
 
 def _parse_proto(proto: tf.Tensor, *, meta: dict[str, Any]) -> dict[str, tf.Tensor]:
     """Parses one serialized trajectory record into its constituent tensors.
@@ -40,7 +51,7 @@ def _parse_proto(proto: tf.Tensor, *, meta: dict[str, Any]) -> dict[str, tf.Tens
     parsed_proto = {}
     for feature_name, schema in meta["features"].items():
         data = tf.io.decode_raw(
-            schemaless_features[feature_name].values, getattr(tf, schema["dtype"])
+            schemaless_features[feature_name].values, _DTYPE_MAP[schema["dtype"]]
         )
         parsed_proto[feature_name] = tf.reshape(data, schema["shape"])
 
