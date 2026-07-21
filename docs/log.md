@@ -25,3 +25,18 @@ fields are genuinely static.
 [x] Started deriving edge_index from `cells` (once per trajectory, not once per training
 pair). Pull the 3 edges out of each triangle, sort each pair so the smaller node index
 comes first, then dedup — 9084 raw edges down to 4606 unique ones for a sample trajectory.
+
+### 2026-07-16
+[x] Built a script to grab a 2 trajectories from a dataset's test split,
+truncate them to 10 frames, and save them off as small standalone .tfrecord +
+meta.json fixtures.
+- adaptive remeshing systems use `dynamic_varlen` fields since
+their meshes actually get remeshed frame to frame and the current parser only supports
+`static`/`dynamic`.
+- also found a that `flag_dynamic_sizing`'s `sizing_field` has malformed `dtype` value
+`"<dtype: 'float32'>"` instead of `"float32"`. Need to fix.
+
+### 2026-07-20
+[x] Tracked non `dynamic_varlen` datasets (airfoil, cylinder_flow, deforming_plate,
+flag_minimal, flag_simple, sphere_simple) with git LFS instead of committing the
+.tfrecords as plain blobs, so repeated regeneration doesn't bloat repo history.
