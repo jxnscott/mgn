@@ -43,6 +43,11 @@ def truncate_trajectory(
 
     raw_fields = {}
     for feature_name, schema in meta["features"].items():
+        if schema["type"] not in ("static", "dynamic"):
+            raise ValueError(
+                f"{feature_name} has unsupported type {schema['type']!r}; "
+                "only 'static'/'dynamic' fields are handled"
+            )
         tensor = trajectory[feature_name]
         if schema["type"] == "dynamic":
             tensor = tensor[:num_frames]
@@ -63,7 +68,12 @@ def build_truncated_meta(meta: dict[str, Any], *, num_frames: int) -> dict[str, 
     """
     new_meta = json.loads(json.dumps(meta))
     new_meta["trajectory_length"] = num_frames
-    for schema in new_meta["features"].values():
+    for feature_name, schema in new_meta["features"].items():
+        if schema["type"] not in ("static", "dynamic"):
+            raise ValueError(
+                f"{feature_name} has unsupported type {schema['type']!r}; "
+                "only 'static'/'dynamic' fields are handled"
+            )
         if schema["type"] == "dynamic":
             schema["shape"][0] = num_frames
     return new_meta
