@@ -1,7 +1,6 @@
 """Loads the FlagSimple cloth dataset and caches it to disk as torch tensors."""
 
 import functools
-import json
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +12,7 @@ PARALLEL_CALLS = 8
 PREFETCH_BUFFER = 1
 
 
-def _parse_proto(proto: tf.Tensor, *, meta: dict[str, Any]) -> dict[str, tf.Tensor]:
+def _parse_proto(protocol_buffer: tf.Tensor, *, metadata: dict[str, Any]) -> dict[str, tf.Tensor]:
     """Parses one serialized trajectory record into its constituent tensors.
 
     Every field is stored in the tf.Example as raw bytes (via
@@ -26,19 +25,20 @@ def _parse_proto(proto: tf.Tensor, *, meta: dict[str, Any]) -> dict[str, tf.Tens
     uniformity (we don't run any TF-side per-timestep slicing).
 
     Args:
-        proto: A scalar string tensor holding one serialized tf.Example
+        protocol_buffer: A scalar string tensor holding one serialized tf.Example
             record, as yielded by a TFRecordDataset.
-        meta: Parsed contents of the dataset's meta.json, describing the
-            dtype/shape of every field to decode.
+        metadata: Parsed contents of the meta.json corresponding to the protobuffer.
 
     Returns:
         A dict mapping field name to its decoded tensor.
     """
-    empty_feature_container = {key: tf.io.VarLenFeature(tf.string) for key in meta["field_names"]}
-    schemaless_features = tf.io.parse_single_example(proto, empty_feature_container)
+    empty_feature_container = {
+        key: tf.io.VarLenFeature(tf.string) for key in metadata["field_names"]
+    }
+    schemaless_features = tf.io.parse_single_example(protocol_buffer, empty_feature_container)
 
     parsed_proto = {}
-    for feature_name, schema in meta["features"].items():
+    for feature_name, schema in metadata["features"].items():
         data = tf.io.decode_raw(
             schemaless_features[feature_name].values, getattr(tf, schema["dtype"])
         )
@@ -47,32 +47,43 @@ def _parse_proto(proto: tf.Tensor, *, meta: dict[str, Any]) -> dict[str, tf.Tens
     return parsed_proto
 
 
-def load_dataset_split(*, dataset_directory: Path, split: str) -> tf.data.Dataset:
-    """Loads a raw trajectory dataset from a directory of TFRecord shards.
+def load_tfrecord_with_metadata(
+    *,
+    metadata: dict,
+    tf_record_path: Path,
+    num_parallel_calls: int,
+    deterministic: bool,
+    buffer_size: int,
+) -> tf.data.Dataset:
+    """Loads a raw trajectory dataset.
 
     Args:
-        dataset_directory: Directory containing "meta.json" and one "<split>.tfrecord"
-            file per split.
-        split: Name of the split to load, e.g. "train", "valid", or "test".
-            Selects "<path>/<split>.tfrecord".
+        metadata: Parsed contents of the meta.json corresponding to `tf_record_path`.
+        tf_record_path: path to the `.tfrecord` to load.
+        num_parallel_calls: kwarg of `lazy_dataset.map()`,  how many elements get processed by
+            `map_func` concurrently, instead of one at a time.
+        deterministic: kwarg of `lazy_dataset.map()`, controls whether output order is preserved
+            when running in parallel.
+        buffer_size: kwarg of lazy_dataset.prefetch(), decouples producing dataset elements from
+            consuming them by letting the pipeline prepare up to `buffer_size` elements ahead of
+            time in a background thread.
 
     Returns:
         A tf.data.Dataset whose elements are dicts (see ``_parse_proto``)
         of decoded per-trajectory tensors.
     """
-    with (dataset_directory / "meta.json").open(mode="r") as fp:
-        metadata = json.load(fp=fp)
+    lazy_dataset = tf.data.TFRecordDataset(str(tf_record_path))
 
-    lazy_dataset = tf.data.TFRecordDataset(str(dataset_directory / f"{split}.tfrecord"))
-
-    metadata_fused_parse = functools.partial(_parse_proto, meta=metadata)
+    fused_parse_proto = functools.partial(_parse_proto, metadata=metadata)
     lazy_dataset = lazy_dataset.map(
-        metadata_fused_parse, num_parallel_calls=PARALLEL_CALLS, deterministic=True
+        map_func=fused_parse_proto,
+        num_parallel_calls=num_parallel_calls,
+        deterministic=deterministic,
     )
 
     # optimize performance by prefetching the next batch while the current is being
     # consumed.
-    return lazy_dataset.prefetch(PREFETCH_BUFFER)
+    return lazy_dataset.prefetch(buffer_size=buffer_size)
 
 
 def cache_raw_trajectories_to_disk(*, dataset: tf.data.Dataset, out_dir: Path) -> None:
