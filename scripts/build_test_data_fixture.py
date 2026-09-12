@@ -15,7 +15,7 @@ from typing import Any
 
 import tensorflow as tf
 
-from mgn.data_processing import load_dataset
+from mgn.tensorflow_to_pytorch import load_dataset
 
 
 def _bytes_feature(raw_bytes: bytes) -> tf.train.Feature:
