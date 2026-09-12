@@ -5,7 +5,7 @@ description = "MeshGraphNets reimplementation"
 authors = [
     { name = "Jackson Scott", email = "hello@jxnscott.com" },
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.12, <3.13"
 
 
 [build-system]
