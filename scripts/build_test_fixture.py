@@ -40,14 +40,14 @@ def truncate_trajectory(
         A dict mapping field name to its (possibly truncated) raw bytes,
         ready to be wrapped in a tf.Example.
     """
-
     raw_fields = {}
     for feature_name, schema in meta["features"].items():
         if schema["type"] not in ("static", "dynamic"):
-            raise ValueError(
+            msg = (
                 f"{feature_name} has unsupported type {schema['type']!r}; "
                 "only 'static'/'dynamic' fields are handled"
             )
+            raise ValueError(msg)
         tensor = trajectory[feature_name]
         if schema["type"] == "dynamic":
             tensor = tensor[:num_frames]
@@ -70,10 +70,11 @@ def build_truncated_meta(meta: dict[str, Any], *, num_frames: int) -> dict[str, 
     new_meta["trajectory_length"] = num_frames
     for feature_name, schema in new_meta["features"].items():
         if schema["type"] not in ("static", "dynamic"):
-            raise ValueError(
+            msg = (
                 f"{feature_name} has unsupported type {schema['type']!r}; "
                 "only 'static'/'dynamic' fields are handled"
             )
+            raise ValueError(msg)
         if schema["type"] == "dynamic":
             schema["shape"][0] = num_frames
     return new_meta
@@ -102,7 +103,7 @@ def main(
     """
     dataset_dir = data_dir / dataset_name
 
-    with open(dataset_dir / "meta.json", "r") as fp:
+    with (dataset_dir / "meta.json").open(mode="r") as fp:
         meta = json.loads(fp.read())
 
     ds = load_dataset(path=dataset_dir, split="test")
@@ -120,7 +121,7 @@ def main(
             writer.write(example.SerializeToString())
 
     truncated_meta = build_truncated_meta(meta, num_frames=num_frames)
-    with open(output_dir / "meta.json", "w") as fp:
+    with (output_dir / "meta.json").open(mode="w") as fp:
         json.dump(truncated_meta, fp, indent=2)
 
     print(
@@ -130,8 +131,8 @@ def main(
 
 
 if __name__ == "__main__":
-    DATASET_NAME = "sphere_simple"
-    DATA_DIR = Path("/media/jxn/New Volume/data/mgn/data/")
+    DATASET_NAME = "flag_dynamic_sizing"
+    DATA_DIR = Path("/mnt/drives/samsung_ssd/mgn/data/")
     OUTPUT_DIR = Path(f"/home/jxn/dev/meshgraphnets/mgn/tests/data/{DATASET_NAME}")
     NUM_TRAJECTORIES = 2
     NUM_FRAMES = 10

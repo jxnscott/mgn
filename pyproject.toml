@@ -48,7 +48,83 @@ torch = { index = "pytorch-cpu" }
 
 # ----- formatting -----
 [tool.ruff]
+target-version = "py312"
 line-length = 100
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = [
+    # Core Python correctness/style
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+
+    # Documentation
+    "D",      # pydocstyle
+
+    # Naming and typing
+    "N",      # pep8-naming
+    "ANN",    # flake8-annotations
+
+    # Modern Python
+    "UP",     # pyupgrade
+    "FA",     # future annotations
+
+    # Bugs / suspicious code
+    "B",      # flake8-bugbear
+    "BLE",    # blind-except
+    "A",      # builtins shadowing
+    "ASYNC",  # async issues
+    "S",      # flake8-bandit security checks
+
+    # Better Python idioms
+    "C4",     # comprehensions
+    "SIM",    # simplify
+    "PIE",    # miscellaneous improvements
+    "RET",    # return statements
+    "RSE",    # raise statements
+    "FLY",    # prefer f-strings in applicable cases
+    "PERF",   # performance anti-patterns
+    "FURB",   # refurb / modernization suggestions
+
+    # Exceptions
+    "EM",     # exception messages
+    "TRY",    # try/except best practices
+
+    # Paths / time
+    "PTH",    # pathlib
+    "DTZ",    # timezone-aware datetime
+
+    # Imports / packaging
+    "INP",    # implicit namespace packages
+    "TID",    # tidy imports
+    "ICN",    # import conventions
+
+    # Logging
+    "LOG",
+    "G",
+
+    # Tests
+    "PT",     # pytest style
+
+    # General hygiene
+    "ARG",    # unused arguments
+    "ERA",    # commented-out code
+    "PGH",    # pygrep-hooks
+    "PL",     # useful Pylint-derived rules
+    "RUF",    # Ruff-specific rules
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.isort]
 known-first-party = ["mgn"]

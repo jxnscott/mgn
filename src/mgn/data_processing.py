@@ -1,8 +1,8 @@
 """Loads the FlagSimple cloth dataset and caches it to disk as torch tensors."""
 
-from pathlib import Path
-import json
 import functools
+import json
+from pathlib import Path
 from typing import Any
 
 import tensorflow as tf
@@ -47,11 +47,11 @@ def _parse_proto(proto: tf.Tensor, *, meta: dict[str, Any]) -> dict[str, tf.Tens
     return parsed_proto
 
 
-def load_dataset(*, path: Path, split: str) -> tf.data.Dataset:
+def load_dataset_split(*, dataset_directory: Path, split: str) -> tf.data.Dataset:
     """Loads a raw trajectory dataset from a directory of TFRecord shards.
 
     Args:
-        path: Directory containing "meta.json" and one "<split>.tfrecord"
+        dataset_directory: Directory containing "meta.json" and one "<split>.tfrecord"
             file per split.
         split: Name of the split to load, e.g. "train", "valid", or "test".
             Selects "<path>/<split>.tfrecord".
@@ -60,10 +60,10 @@ def load_dataset(*, path: Path, split: str) -> tf.data.Dataset:
         A tf.data.Dataset whose elements are dicts (see ``_parse_proto``)
         of decoded per-trajectory tensors.
     """
-    with open(path / "meta.json", "r") as fp:
-        metadata = json.loads(fp.read())
+    with (dataset_directory / "meta.json").open(mode="r") as fp:
+        metadata = json.load(fp=fp)
 
-    lazy_dataset = tf.data.TFRecordDataset(str(path / f"{split}.tfrecord"))
+    lazy_dataset = tf.data.TFRecordDataset(str(dataset_directory / f"{split}.tfrecord"))
 
     metadata_fused_parse = functools.partial(_parse_proto, meta=metadata)
     lazy_dataset = lazy_dataset.map(
@@ -72,9 +72,7 @@ def load_dataset(*, path: Path, split: str) -> tf.data.Dataset:
 
     # optimize performance by prefetching the next batch while the current is being
     # consumed.
-    lazy_dataset = lazy_dataset.prefetch(PREFETCH_BUFFER)
-
-    return lazy_dataset
+    return lazy_dataset.prefetch(PREFETCH_BUFFER)
 
 
 def cache_raw_trajectories_to_disk(*, dataset: tf.data.Dataset, out_dir: Path) -> None:
@@ -99,7 +97,7 @@ def cache_raw_trajectories_to_disk(*, dataset: tf.data.Dataset, out_dir: Path) -
         torch.save(trajectory, out_dir / f"{i}.pt")
 
 
-def update_flag_simple_node_type_to_static(*, dir: Path) -> None:
+def update_flag_simple_node_type_to_static(*, dataset_directory: Path) -> None:
     """Collapses each cached trajectory's ``node_type`` to a single frame.
 
     ``meta.json`` declares ``node_type`` as "dynamic" (stored with one
@@ -110,7 +108,7 @@ def update_flag_simple_node_type_to_static(*, dir: Path) -> None:
     matching how ``cells``/``mesh_pos`` are already handled.
 
     Args:
-        dir: Directory of cached "<index>.pt" trajectory files to patch,
+        dataset_directory: Directory of cached "<index>.pt" trajectory files to patch,
             as written by ``cache_raw_trajectories_to_disk``.
 
     Raises:
@@ -118,18 +116,19 @@ def update_flag_simple_node_type_to_static(*, dir: Path) -> None:
             any trajectory's ``node_type`` turns out not to be constant
             across time (i.e. the previously verified assumption doesn't hold).
     """
-    if not dir.exists() or not dir.is_dir():
-        raise ValueError(f"{dir} does not exist or is not a directory")
+    if not dataset_directory.exists() or not dataset_directory.is_dir():
+        msg = f"{dataset_directory} does not exist or is not a directory"
+        raise ValueError(msg)
 
-    for pt_file in tqdm(dir.rglob("*.pt"), desc="updating flag simple node_type to static"):
+    desc = "updating flag simple node_type to static"
+    for pt_file in tqdm(dataset_directory.rglob("*.pt"), desc=desc):
         loaded_pt = torch.load(pt_file)
 
         node_type = loaded_pt["node_type"]
 
         if not torch.equal(node_type, node_type[0].expand_as(node_type)):
-            raise ValueError(
-                f"{pt_file} has non-static node_type; cannot collapse to a single frame"
-            )
+            msg = f"{pt_file} has non-static node_type; cannot collapse to a single frame"
+            raise ValueError(msg)
 
         loaded_pt["node_type"] = loaded_pt["node_type"][0, :, :]
 
