@@ -220,3 +220,6 @@ __marimo__/
 # Data
 data/
 !tests/data
+
+# Don't save the vscode workspace to git
+*.code-workspace
