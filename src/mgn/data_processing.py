@@ -13,32 +13,6 @@ PARALLEL_CALLS = 8
 PREFETCH_BUFFER = 1
 
 
-def sanitize_dtype_from_repr_to_normal(*, meta_json_path: Path) -> None:
-    """Docstring.
-
-    Args:
-        meta_json_path: stuff.
-
-    """
-    with Path.open(file=meta_json_path, mode="r+") as fp:
-        metadata = json.load(fp)
-
-        for feature in metadata["features"]:
-            dtype = feature["dtype"]
-
-            if "float32" in dtype:
-                metadata[feature]["dtype"] = "float32"
-
-            elif "int32" in dtype:
-                metadata[feature]["dtype"] = "int32"
-
-            else:
-                msg = f"Unkown dtype: {dtype} in {meta_json_path}"
-                raise ValueError(msg)
-
-        json.dump(obj=metadata, fp=fp)
-
-
 def _parse_proto(proto: tf.Tensor, *, meta: dict[str, Any]) -> dict[str, tf.Tensor]:
     """Parses one serialized trajectory record into its constituent tensors.
 
@@ -86,8 +60,8 @@ def load_dataset_split(*, dataset_directory: Path, split: str) -> tf.data.Datase
         A tf.data.Dataset whose elements are dicts (see ``_parse_proto``)
         of decoded per-trajectory tensors.
     """
-    with Path.open(dataset_directory / "meta.json") as fp:
-        metadata = json.loads(fp.read())
+    with (dataset_directory / "meta.json").open(mode="r") as fp:
+        metadata = json.load(fp=fp)
 
     lazy_dataset = tf.data.TFRecordDataset(str(dataset_directory / f"{split}.tfrecord"))
 

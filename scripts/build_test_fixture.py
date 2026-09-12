@@ -103,7 +103,7 @@ def main(
     """
     dataset_dir = data_dir / dataset_name
 
-    with Path.open(dataset_dir / "meta.json") as fp:
+    with (dataset_dir / "meta.json").open(mode="r") as fp:
         meta = json.loads(fp.read())
 
     ds = load_dataset(path=dataset_dir, split="test")
@@ -121,7 +121,7 @@ def main(
             writer.write(example.SerializeToString())
 
     truncated_meta = build_truncated_meta(meta, num_frames=num_frames)
-    with Path.open(output_dir / "meta.json", "w") as fp:
+    with (output_dir / "meta.json").open(mode="w") as fp:
         json.dump(truncated_meta, fp, indent=2)
 
     print(
