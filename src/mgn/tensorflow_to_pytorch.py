@@ -8,49 +8,48 @@ import tensorflow as tf
 import torch
 from tqdm.auto import tqdm
 
-PARALLEL_CALLS = 8
-PREFETCH_BUFFER = 1
 
-
-def _parse_proto(protocol_buffer: tf.Tensor, *, metadata: dict[str, Any]) -> dict[str, tf.Tensor]:
+def _parse_protocol_buffer(
+    serialized: tf.Tensor, *, metadata: dict[str, Any]
+) -> dict[str, tf.Tensor]:
     """Parses one serialized trajectory record into its constituent tensors.
 
-    Every field is stored in the tf.Example as raw bytes (via
-    VarLenFeature(tf.string)), with its true dtype/shape recorded
-    separately in ``meta``. This decodes those bytes back into typed,
-    reshaped tensors, at whatever shape ``meta`` declares for them —
-    static fields (e.g. mesh connectivity, constant across the
-    trajectory) are returned as a single frame, not tiled to a leading
-    trajectory-length axis, since nothing downstream needs that
-    uniformity (we don't run any TF-side per-timestep slicing).
+    Every field is stored in the tf.Example as raw bytes (via VarLenFeature(tf.string)), with its
+    true dtype/shape recorded separately in `metadata`. This function decodes those bytes back into
+    typed, reshaped tensors, at whatever shape `metadata` declares for them.
 
     Args:
-        protocol_buffer: A scalar string tensor holding one serialized tf.Example
-            record, as yielded by a TFRecordDataset.
-        metadata: Parsed contents of the meta.json corresponding to the protobuffer.
+        serialized: A scalar string Tensor, a single serialized Example.
+        metadata: Parsed contents of the meta.json corresponding to the scalar string Tensor.
 
     Returns:
-        A dict mapping field name to its decoded tensor.
+        A dict mapping `field_name` to its decoded Tensor.
     """
-    empty_feature_container = {
-        key: tf.io.VarLenFeature(tf.string) for key in metadata["field_names"]
+    feature_name_mapping = {
+        feature_name: tf.io.VarLenFeature(tf.string) for feature_name in metadata["field_names"]
     }
-    schemaless_features = tf.io.parse_single_example(protocol_buffer, empty_feature_container)
 
-    parsed_proto = {}
+    raw_byte_features = tf.io.parse_single_example(
+        serialized=serialized, features=feature_name_mapping
+    )
+
+    decoded_features = {}
     for feature_name, schema in metadata["features"].items():
-        data = tf.io.decode_raw(
-            schemaless_features[feature_name].values, getattr(tf, schema["dtype"])
-        )
-        parsed_proto[feature_name] = tf.reshape(data, schema["shape"])
+        out_type = tf.as_dtype(type_value=schema["dtype"])
 
-    return parsed_proto
+        flat_tensors = tf.io.decode_raw(
+            input_bytes=raw_byte_features[feature_name].values, out_type=out_type
+        )
+
+        decoded_features[feature_name] = tf.reshape(tensor=flat_tensors, shape=schema["shape"])
+
+    return decoded_features
 
 
 def load_tfrecord_with_metadata(
     *,
-    metadata: dict,
-    tf_record_path: Path,
+    metadata: dict[str, Any],
+    tfrecord_path: Path,
     num_parallel_calls: int,
     deterministic: bool,
     buffer_size: int,
@@ -59,7 +58,7 @@ def load_tfrecord_with_metadata(
 
     Args:
         metadata: Parsed contents of the meta.json corresponding to `tf_record_path`.
-        tf_record_path: path to the `.tfrecord` to load.
+        tfrecord_path: path to the `.tfrecord` to load.
         num_parallel_calls: kwarg of `lazy_dataset.map()`,  how many elements get processed by
             `map_func` concurrently, instead of one at a time.
         deterministic: kwarg of `lazy_dataset.map()`, controls whether output order is preserved
@@ -72,21 +71,19 @@ def load_tfrecord_with_metadata(
         A tf.data.Dataset whose elements are dicts (see ``_parse_proto``)
         of decoded per-trajectory tensors.
     """
-    lazy_dataset = tf.data.TFRecordDataset(str(tf_record_path))
+    lazy_dataset = tf.data.TFRecordDataset(str(tfrecord_path))
 
-    fused_parse_proto = functools.partial(_parse_proto, metadata=metadata)
+    fused_parse_protocol_buffer = functools.partial(_parse_protocol_buffer, metadata=metadata)
     lazy_dataset = lazy_dataset.map(
-        map_func=fused_parse_proto,
+        map_func=fused_parse_protocol_buffer,
         num_parallel_calls=num_parallel_calls,
         deterministic=deterministic,
     )
 
-    # optimize performance by prefetching the next batch while the current is being
-    # consumed.
     return lazy_dataset.prefetch(buffer_size=buffer_size)
 
 
-def cache_raw_trajectories_to_disk(*, dataset: tf.data.Dataset, out_dir: Path) -> None:
+def convert_trajectories_to_pt_and_save(*, dataset: tf.data.Dataset, out_dir: Path) -> None:
     """Converts each trajectory in ``dataset`` to torch tensors and saves it.
 
     Writes one ``.pt`` file per trajectory to ``out_dir``, so peak memory is
@@ -98,49 +95,17 @@ def cache_raw_trajectories_to_disk(*, dataset: tf.data.Dataset, out_dir: Path) -
         out_dir: Directory to write "<index>.pt" files into. Created if it
             doesn't exist.
     """
+    if out_dir.exists() and not any(out_dir.iterdir()):
+        msg = f"{out_dir} is not empty. If you wish to overwrite, manually delete."
+        raise RuntimeError(msg)
+
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    for i, tf_tensor in enumerate(tqdm(dataset, desc="caching trajectories to disk...")):
+    for trajectory_idx, parsed_trajectory in enumerate(
+        tqdm(dataset, desc="converting trajectories to .pt and saving to disk.")
+    ):
         trajectory = {
-            feature_name: torch.from_numpy(tensor.numpy())
-            for feature_name, tensor in tf_tensor.items()
+            feature_name: torch.from_numpy(tf_tensor.numpy())
+            for feature_name, tf_tensor in parsed_trajectory.items()
         }
-        torch.save(trajectory, out_dir / f"{i}.pt")
-
-
-def update_flag_simple_node_type_to_static(*, dataset_directory: Path) -> None:
-    """Collapses each cached trajectory's ``node_type`` to a single frame.
-
-    ``meta.json`` declares ``node_type`` as "dynamic" (stored with one
-    value per timestep), but for FlagSimple it's verified constant across
-    every timestep in every trajectory — possibly "dynamic" only because the schema is
-    shared with FlagDynamic/SphereDynamic, which do remesh. This patches
-    already-cached ``.pt`` files in place to store just one frame,
-    matching how ``cells``/``mesh_pos`` are already handled.
-
-    Args:
-        dataset_directory: Directory of cached "<index>.pt" trajectory files to patch,
-            as written by ``cache_raw_trajectories_to_disk``.
-
-    Raises:
-        ValueError: If ``dir`` doesn't exist or isn't a directory, or if
-            any trajectory's ``node_type`` turns out not to be constant
-            across time (i.e. the previously verified assumption doesn't hold).
-    """
-    if not dataset_directory.exists() or not dataset_directory.is_dir():
-        msg = f"{dataset_directory} does not exist or is not a directory"
-        raise ValueError(msg)
-
-    desc = "updating flag simple node_type to static"
-    for pt_file in tqdm(dataset_directory.rglob("*.pt"), desc=desc):
-        loaded_pt = torch.load(pt_file)
-
-        node_type = loaded_pt["node_type"]
-
-        if not torch.equal(node_type, node_type[0].expand_as(node_type)):
-            msg = f"{pt_file} has non-static node_type; cannot collapse to a single frame"
-            raise ValueError(msg)
-
-        loaded_pt["node_type"] = loaded_pt["node_type"][0, :, :]
-
-        torch.save(loaded_pt, pt_file)
+        torch.save(trajectory, out_dir / f"{trajectory_idx}.pt")
