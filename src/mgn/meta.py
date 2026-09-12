@@ -34,7 +34,7 @@ def sanitize_meta_json_dtypes(*, meta_json_path: Path, indent: int) -> None:
         metadata = json.load(fp=fp)
 
     for schema in metadata["features"].values():
-        schema["dtype"] = _normalize_dtype(schema["dtype"])
+        schema["dtype"] = _normalize_dtype(dtype=schema["dtype"])
 
     with meta_json_path.open("w") as fp:
         json.dump(metadata, fp, indent=indent)
