@@ -86,8 +86,8 @@ def load_dataset_split(*, dataset_directory: Path, split: str) -> tf.data.Datase
         A tf.data.Dataset whose elements are dicts (see ``_parse_proto``)
         of decoded per-trajectory tensors.
     """
-    with Path.open(dataset_directory / "meta.json") as fp:
-        metadata = json.loads(fp.read())
+    with (dataset_directory / "meta.json").open(mode="r") as fp:
+        metadata = json.load(fp=fp)
 
     lazy_dataset = tf.data.TFRecordDataset(str(dataset_directory / f"{split}.tfrecord"))
 

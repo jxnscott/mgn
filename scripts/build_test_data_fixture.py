@@ -7,9 +7,6 @@ commit as a test fixture.
 
 Static fields (e.g. mesh connectivity) aren't truncated; they're already a
 single frame in the raw encoding.
-
-Only handles "static"/"dynamic" fields. Datasets using "dynamic_varlen"
-(flag_dynamic, flag_dynamic_sizing, sphere_dynamic) are not supported.
 """
 
 import json
@@ -103,7 +100,7 @@ def main(
     """
     dataset_dir = data_dir / dataset_name
 
-    with (dataset_dir / "meta.json").open(mode="r") as fp:
+    with Path.open(dataset_dir / "meta.json") as fp:
         meta = json.loads(fp.read())
 
     ds = load_dataset(path=dataset_dir, split="test")
@@ -121,7 +118,7 @@ def main(
             writer.write(example.SerializeToString())
 
     truncated_meta = build_truncated_meta(meta, num_frames=num_frames)
-    with (output_dir / "meta.json").open(mode="w") as fp:
+    with Path.open(output_dir / "meta.json", "w") as fp:
         json.dump(truncated_meta, fp, indent=2)
 
     print(
