@@ -4,13 +4,18 @@ A from-scratch PyTorch reimplementation of **MeshGraphNets** (Pfaff et al., 2021
 *Learning Mesh-Based Simulation with Graph Networks*), built for understanding and
 extension.
 
+## Status
+
+In progress. Current work focuses on understanding the datasets and implementing
+tested preprocessing for PyTorch Geometric. Model training and reproduction of
+the paper’s results are not yet complete.
+
 ## Setup
 
 ````bash
-uv sync --all-groups          # dev
-uv sync --group core_cpu      # runtime
+uv sync --all-groups
 
-# formattting
+# formatting
 uv run pre-commit install
 uv run nbstripout --install
 ````
