@@ -13,9 +13,9 @@ the paper’s results are not yet complete.
 ## Setup
 
 ````bash
-uv sync --all-groups          # dev
+uv sync --all-groups
 
-# formattting
+# formatting
 uv run pre-commit install
 uv run nbstripout --install
 ````
